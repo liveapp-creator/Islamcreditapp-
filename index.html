@@ -66,6 +66,8 @@ input:focus{outline:2px solid #14854f44;border-color:#14854f}
 <div id="t_h" class="hid"><div class="c"><h4>Shop History</h4><input id="hid" placeholder="Outlet ID / Name (khali = saari shops)" autocomplete="off" oninput="sug('hid','hsg')"><div class="sgb" id="hsg"></div>
 <div class="row"><div><label>From</label><input id="hf" type="date"></div><div><label>To</label><input id="ht" type="date"></div></div>
 <button onclick="hist()">Search</button> <button class="g" onclick="dl('history',H&&H.csv)">Excel Download</button></div><div id="hout"></div></div>
+<div id="t_u" class="hid"><div class="cards"><div>Udhar Wale Bande<b id="uc"></b></div><div>Total Udhar (Opening+Credit)<b id="ut"></b></div><div>Total Baqi Remaining<b class="red" id="ur"></b></div></div>
+<div class="c"><h4>Udhar Wali Shops</h4><input id="usr" placeholder="Search: ID / Name / Phone / Salesman" oninput="udl()"><button onclick="dl('udhar_list',UL)" class="g">Excel Download</button><button onclick="upr()">🖨 Print</button><div class="sc" id="udl" style="margin-top:6px"></div></div></div>
 <div id="t_b" class="hid"><div class="c"><h4>Live Bill</h4><div style="font-size:13px;margin-bottom:6px">🕒 <b id="clk"></b> | User: <b id="bu"></b></div>
 <input id="bid" placeholder="🔍 Shop search: ID / Name (ya neeche khud likhein)" autocomplete="off" oninput="sug('bid','bsg','bInfo')"><div class="sgb" id="bsg"></div><div id="binf" style="margin:4px 0;font-size:13px"></div>
 <input id="bname" placeholder="Shop Name (khud bhi likh sakte hain)"><div class="row"><input id="baddr" placeholder="Address"><input id="bph" placeholder="Phone"></div>
@@ -97,7 +99,7 @@ async function sync(){if(!S)return;try{const r=await call('data');if(r.ok&&S){D=
 function loc(a,x){const k={Outlets:'o',Entries:'e',Bills:'b',Users:'u'}[x.s],i0=x.s=='Users'?'UserName':'ID';if(!k)return;
 if(a=='add')D[k].push(x.row);else if(a=='del')D[k]=D[k].filter(r=>String(r[i0])!=String(x.id));else if(a=='upd'){const r=D[k].find(r=>String(r[i0])==String(x.id));r&&Object.assign(r,x.row)}build();render()}
 async function op(a,x){loc(a,x);try{const r=await call(a,x);if(!r.ok){alert(r.msg||'Error');await sync();return false}sync();return true}catch(e){alert('Internet nahi hai - save nahi hua');try{D=JSON.parse(localStorage.D)}catch(e){}build();render();return false}}
-const tabs=[['d','🏠 Dashboard'],['o','🏪 Shops'],['h','📜 History'],['b','🧾 Bill']];
+const tabs=[['d','🏠 Dashboard'],['o','🏪 Shops'],['h','📜 History'],['u','💰 Udhar List'],['b','🧾 Bill']];
 function start(){build();$('L').classList.add('hid');$('A').classList.remove('hid');$('who').textContent=S.name+' ('+S.role+')';
 if(S.role=='Admin'&&!tabs.find(t=>t[0]=='a'))tabs.push(['a','⚙️ Admin']);$('nav').innerHTML=tabs.filter(t=>t[0]!='a'||S.role=='Admin').map(t=>`<button id="n_${t[0]}" onclick="tab('${t[0]}')">${t[1]}</button>`).join('');
 $('edt').value=td();$('os').value=S.name;$('bu').textContent=S.name;const m=td().slice(0,8)+'01';['hf','bsf'].forEach(i=>$(i).value=m);['ht','bst'].forEach(i=>$(i).value=td());
@@ -110,7 +112,7 @@ function pick(el,i,b,cb){$(i).value=el.dataset.v;$(b).innerHTML='';if(cb)window[
 const bal=r=>r<0?`<span class="grn">${F(-r)} Advance</span>`:`<span class="red">${F(r)}</span>`;
 function render(){if(!S)return;$('ann').innerHTML=D.n?`<span>📢 ${E(D.n)}</span>`:'';let u=0,w=0;for(const k in T){u+=T[k].u;w+=T[k].w}
 $('s1').textContent=F(u);$('s2').textContent=F(w);$('s3').textContent=F(u-w);
-re();rl();bh();const ps=new Set();D.b.slice(-100).forEach(b=>{try{bparse(b).it.forEach(x=>ps.add(x.p))}catch(e){}});$('pl').innerHTML=[...ps].map(p=>`<option value="${E(p)}">`).join('');
+re();rl();bh();udl();const ps=new Set();D.b.slice(-100).forEach(b=>{try{bparse(b).it.forEach(x=>ps.add(x.p))}catch(e){}});$('pl').innerHTML=[...ps].map(p=>`<option value="${E(p)}">`).join('');
 if(S.role=='Admin'){if(document.activeElement!=$('an'))$('an').value=D.n;$('ul').innerHTML='<table><tr><th>User<th>Status<th></tr>'+D.u.map(x=>`<tr><td>${E(x.UserName)}<br><small>${E(x.FullName)} ${x.Role}</small><td>${x.Status}<td><button onclick="tgl('${E(x.UserName)}','${x.Status}')">${x.Status=='Active'?'Block':'Activate'}</button> <button class="g" onclick="rpw('${E(x.UserName)}')">Pass</button> <button class="r" onclick="del('Users','${E(x.UserName)}')">X</button></tr>`).join('')+'</table>'}}
 function re(){if(!S)return;const f=$('rf').value,t=$('rt').value,m=D.e.filter(e=>(!f||e.Date>=f)&&(!t||e.Date<=t)).sort((a,b)=>b.ID-a.ID);let c=0,w=0;m.forEach(e=>{c+=N(e.Credit);w+=N(e.Wasooli)});
 $('rsum').innerHTML=`${m.length} entries | Credit: <b>${F(c)}</b> | Wasooli: <b class="grn">${F(w)}</b>`;
@@ -126,6 +128,15 @@ async function saveO(){const row={ID:$('oi').value.trim(),Name:$('on').value,Add
 if(!row.ID||!row.Name)return alert('ID aur Name zaruri');if(!editO&&OM[row.ID])return alert('Ye ID pehle se hai');let ok;if(editO){delete row.AddedBy;ok=await op('upd',{s:'Outlets',id:editO,row})}else ok=await op('add',{s:'Outlets',row});if(ok)clrO()}
 function editOf(id){const o=OM[id];editO=id;$('ot').textContent='Edit Shop';$('oi').value=o.ID;$('on').value=o.Name;$('oa').value=o.Address;$('op').value=o.Phone;$('os').value=o.Salesman;$('oo').value=o.Opening;scrollTo(0,0)}
 function clrO(){editO=null;$('ot').textContent='New Shop';['oi','on','oa','op','oo'].forEach(i=>$(i).value='');$('os').value=S.name}
+let UL=null;
+function ulist(){const q=($('usr').value||'').trim().toLowerCase();let a=D.o.map(o=>({o,t:tot(o.ID)})).filter(x=>x.t.r>0);
+const gu=a.reduce((z,x)=>z+x.t.u,0),gr=a.reduce((z,x)=>z+x.t.r,0);
+let m=q?a.filter(x=>(x.o.ID+' '+x.o.Name+' '+x.o.Phone+' '+x.o.Salesman).toLowerCase().includes(q)):a;m.sort((x,y)=>y.t.r-x.t.r);return{a,m,gu,gr}}
+function udl(){if(!$('udl'))return;const {a,m,gu,gr}=ulist(),mr=m.reduce((z,x)=>z+x.t.r,0);
+$('uc').textContent=a.length;$('ut').textContent=F(gu);$('ur').textContent=F(gr);
+UL=[['Sr','Outlet ID','Shop','Phone','Salesman','Total Udhar','Wasooli','Remaining'],...m.map((x,i)=>[i+1,x.o.ID,x.o.Name,x.o.Phone,x.o.Salesman,x.t.u,x.t.w,x.t.r]),['','','','','TOTAL','','',mr]];
+$('udl').innerHTML=`<small>${m.length} shops | Remaining: <b class="red">${F(mr)}</b></small><table><tr><th>#<th>ID<th>Shop<th>Udhar<th>Wasooli<th>Remaining</tr>${m.map((x,i)=>`<tr><td>${i+1}<td>${E(x.o.ID)}<td>${E(x.o.Name)}<br><small>${E(x.o.Phone)} | ${E(x.o.Salesman)}</small><td>${F(x.t.u)}<td>${F(x.t.w)}<td class="red"><b>${F(x.t.r)}</b></tr>`).join('')||'<tr><td colspan=6>Koi udhar wali shop nahi</tr>'}<tr style="font-weight:bold;background:#f4f7f5"><td colspan=3>TOTAL<td><td><td class="red">${F(mr)}</tr></table>`}
+function upr(){udl();const {m}=ulist(),mr=m.reduce((z,x)=>z+x.t.r,0);$('pr').innerHTML=`<div class="cp"><h1>ISLAM AND CO</h1><div class="bs2">Udhar List - ${td()}</div><table style="width:100%"><tr><th>#<th>ID<th>Shop<th>Remaining</tr>${m.map((x,i)=>`<tr><td>${i+1}<td>${E(x.o.ID)}<td>${E(x.o.Name)}<td style="text-align:right">${F(x.t.r)}</tr>`).join('')}<tr><td colspan=3><b>TOTAL (${m.length})</b><td style="text-align:right"><b>${F(mr)}</b></tr></table></div>`;$('pw').classList.add('on');$('pw').scrollTop=0}
 function hist(){const id=$('hid').value.trim(),f=$('hf').value,t=$('ht').value,inR=e=>(!f||e.Date>=f)&&(!t||e.Date<=t);let h='';
 if(id){const o=OM[id];if(!o){$('hout').innerHTML='<div class="c">Shop nahi mili</div>';return}const T0=tot(id),all=[...ent(id)].sort(cmp);let r=N(o.Opening);all.filter(e=>f&&e.Date<f).forEach(e=>r+=N(e.Credit)-N(e.Wasooli));
 const ob=r,cur=all.filter(inR);let pc=0,pw=0;const L=[['Date','Credit','Wasooli','Remarks','Balance']],rows=cur.map(e=>{pc+=N(e.Credit);pw+=N(e.Wasooli);r+=N(e.Credit)-N(e.Wasooli);L.push([e.Date,e.Credit,e.Wasooli,e.Remarks,r]);return`<tr><td>${e.Date}<td>${F(e.Credit)}<td>${F(e.Wasooli)}<td>${E(e.Remarks)}<td>${F(r)}</tr>`}).join('');
